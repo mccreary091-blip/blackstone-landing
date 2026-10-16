@@ -243,3 +243,45 @@
     buildWidget();
   }
 })();
+// Make links in chat messages clickable
+(function () {
+  var urlRe = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
+  function linkify(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    var nodes = [];
+    while (walker.nextNode()) {
+      var n = walker.currentNode;
+      if (!n.parentNode || n.parentNode.closest('a, script, style, textarea, input')) continue;
+      urlRe.lastIndex = 0;
+      if (urlRe.test(n.nodeValue)) nodes.push(n);
+    }
+    nodes.forEach(function (n) {
+      var frag = document.createDocumentFragment();
+      var text = n.nodeValue, last = 0, m;
+      urlRe.lastIndex = 0;
+      while ((m = urlRe.exec(text))) {
+        frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        var a = document.createElement('a');
+        a.href = m[0]; a.textContent = m[0];
+        a.target = '_blank'; a.rel = 'noopener';
+        a.style.textDecoration = 'underline';
+        frag.appendChild(a);
+        last = m.index + m[0].length;
+      }
+      frag.appendChild(document.createTextNode(text.slice(last)));
+      n.parentNode.replaceChild(frag, n);
+    });
+  }
+  function start() {
+    new MutationObserver(function (muts) {
+      muts.forEach(function (mu) {
+        mu.addedNodes.forEach(function (node) {
+          if (node.nodeType === 3 && node.parentNode) linkify(node.parentNode);
+          else if (node.nodeType === 1) linkify(node);
+        });
+        if (mu.type === 'characterData' && mu.target.parentNode) linkify(mu.target.parentNode);
+      });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
